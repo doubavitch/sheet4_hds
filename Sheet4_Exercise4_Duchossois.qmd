@@ -1,0 +1,20 @@
+---
+title: "Solution Ex4 Sheet4 Duchossois"
+author: "Clara Duchossois"
+date: "2024-05-15"
+output: html-document
+---
+
+### Loading libraries
+
+```{r}
+library(glmnet)
+```
+
+### Question 1: Build the Ridge Regression model for the variable prostate antigen (lpsa). Use it to obtain
+the initial estimates of the coefficients b^{in}_j.
+
+```{r}
+
+```
+
