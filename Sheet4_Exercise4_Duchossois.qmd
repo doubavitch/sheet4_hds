@@ -11,6 +11,7 @@ output: html-document
 library(tidyverse)
 library(dplyr)
 library(glmnet)
+library(pROC)
 ```
 
 ### Loading the dataset and cleaning up the data
@@ -78,9 +79,33 @@ for (gamma in c(0.5, 1, 2)){
 ```{r}
 # Perform Adaptive Lasso
 set.seed(123)
+min_auc <- Inf
+min_lambda <- NULL
+auc_values <- list()
 for (gamma in c(0.5, 1, 2)){
-  adaptive_lasso <- cv.glmnet(data, lpsa, alpha=1, penalty.factor = adaptive_weights(beta[-1,], gamma))
-  plot(adaptive_lasso, xvar = "lambda")
+  weights <- adaptive_weights(beta[-1,], gamma)
+  adaptive_lasso <- cv.glmnet(data, lpsa, alpha=1, penalty.factor = weights)
+  plot(adaptive_lasso)
+  auc <- max(adaptive_lasso$cvm)
+  auc_values[[as.character(gamma)]] <- auc
+  lambda <- adaptive_lasso$lambda.min
+  if (auc < min_auc) {
+    min_auc <- auc
+    min_lambda <- lambda
+  }
+  cat("For γ =", gamma, "Minimum AUC:", auc, "Minimum λ:", lambda, "\n")
+  mtext(side = 3, line = -1, paste("Gamma =", gamma), cex = 0.8, font = 2)  # Add title specifying the value of gamma
 }
+
+cat("\nOverall minimum AUC:", min_auc, "corresponding to λ:", min_lambda, "\n")
+
+# Plot AUC for different values of γ
+auc_df <- data.frame(gamma = as.numeric(names(auc_values)), AUC = unlist(auc_values))
+ggplot(auc_df, aes(x = gamma, y = AUC)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Gamma", y = "AUC", title = "AUC for Different Values of Gamma")
+
 ```
+
 
