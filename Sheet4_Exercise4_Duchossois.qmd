@@ -5,16 +5,82 @@ date: "2024-05-15"
 output: html-document
 ---
 
-### Loading libraries
+### Loading libraries and load dataset
 
 ```{r}
+library(tidyverse)
+library(dplyr)
 library(glmnet)
 ```
+
+### Loading the dataset and cleaning up the data
+
+```{r}
+url <- "https://web.stanford.edu/~hastie/ElemStatLearn/datasets/prostate.data"
+prostate_data <- read.table(url, header = TRUE) |> rename_all(function(x) gsub(" ", "", x)) |> mutate(across(c(lcavol,lbph,lcp,pgg45,lpsa), as.double))
+
+# we filter the data that belongs to the train and test sets, and exclude the 'train' column
+prostate_data_train <- prostate_data |> filter(train == TRUE) |> select(-c(10))
+prostate_data_test <- prostate_data |> filter(train == FALSE) |> select(-c(10))
+
+# Extract response variable (lpsa) and predictors from dataset
+lpsa <- prostate_data_train$lpsa
+data <- as.matrix(prostate_data_train[, -c(9)]) # Exclude lpsa (response)
+```
+
 
 ### Question 1: Build the Ridge Regression model for the variable prostate antigen (lpsa). Use it to obtain
 the initial estimates of the coefficients b^{in}_j.
 
 ```{r}
+# Perform Ridge Regression
+ridge_model <- glmnet(data, lpsa, alpha = 0) # Ridge Regression
+ridge_model["beta"]
+plot(ridge_model, xvar = "lambda")
+```
 
+### Question 2: Create the Adaptive Weights ωˆj for γ = 0, 5, 1 and 2. Choose the best λ through 10-fold cross validation.
+
+```{r}
+# Calculate Adaptive Weights for different values of γ
+adaptive_weights <- function(b, gamma) {
+  return(1/(abs(b))^gamma)
+}
+
+# Cross-validation for λ selection
+cv_ridge <- cv.glmnet(data, lpsa, alpha = 0, nfolds = 10, gamma = c(0.5, 1, 2)) 
+lambda_min <- cv_ridge$lambda.min
+cat("best λ:", lambda_min, "\n\n")
+
+beta <- as.matrix(coef(cv_ridge, s = cv_ridge$lambda.min))
+
+# Adaptive weights for γ = 0, 5, 1 and 2
+for (gamma in c(0.5, 1, 2)){
+  cat("adaptive weitghts for : γ =", gamma, "\n")
+  print(adaptive_weights(beta[-1,], gamma))
+  cat("\n")
+}
+```
+
+### Alternative solution: we proceed as before but now assume that all the computations are done without taking the best lambda possible
+
+```{r}
+# Adaptive weights for γ = 0, 5, 1 and 2
+for (gamma in c(0.5, 1, 2)){
+  cat("adaptive weitghts for : γ =", gamma, "\n")
+  print(adaptive_weights(ridge_model["beta"][[1]][,1], gamma))
+  cat("\n")
+}
+```
+
+### Question 3: Use the glmnet function to execute the adaptive Lasso. Plot the area under ROC (receiver operating characteristic) curve, also called AUC, and report the values of minimum λ (obtained for miminum AUC).
+
+```{r}
+# Perform Adaptive Lasso
+set.seed(123)
+for (gamma in c(0.5, 1, 2)){
+  adaptive_lasso <- cv.glmnet(data, lpsa, alpha=1, penalty.factor = adaptive_weights(beta[-1,], gamma))
+  plot(adaptive_lasso, xvar = "lambda")
+}
 ```
 
